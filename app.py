@@ -53,7 +53,6 @@ def send_message(message, token):
             f"{BACKEND_URL}/api/chat/",
             json={"query": message},
             headers={"Authorization": f"Bearer {token}"},
-            stream=True,
             timeout=60,
         )
         if r.status_code == 200:
@@ -82,6 +81,23 @@ def get_report(token, month):
         return None, str(e)
 
 
+def extract_document(token, file):
+    try:
+        r = requests.post(
+            f"{BACKEND_URL}/api/extract_doc/",
+            files={"file": (file.name, file, file.type)},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=120,
+        )
+        if r.status_code == 200:
+            return r.json(), None
+        return None, f"Error {r.status_code}: {r.text}"
+    except requests.exceptions.Timeout:
+        return None, "Request timed out. Please try again."
+    except Exception as e:
+        return None, str(e)
+
+
 # Login Page
 def show_login():
     st.title("💰 Expense Tracker AI")
@@ -90,9 +106,7 @@ def show_login():
     with st.form("login_form"):
         email = st.text_input("Email", placeholder="you@example.com")
         password = st.text_input("Password", type="password", placeholder="••••••••")
-        submitted = st.form_submit_button(
-            "Login", use_container_width=True, type="primary"
-        )
+        submitted = st.form_submit_button("Login", use_container_width=True, type="primary")
         if submitted:
             if not email or not password:
                 st.error("Please enter both email and password")
@@ -127,12 +141,8 @@ def show_register():
     with st.form("register_form"):
         email = st.text_input("Email", placeholder="you@example.com")
         password = st.text_input("Password", type="password", placeholder="••••••••")
-        confirm = st.text_input(
-            "Confirm Password", type="password", placeholder="••••••••"
-        )
-        submitted = st.form_submit_button(
-            "Register", use_container_width=True, type="primary"
-        )
+        confirm = st.text_input("Confirm Password", type="password", placeholder="••••••••")
+        submitted = st.form_submit_button("Register", use_container_width=True, type="primary")
         if submitted:
             if not email or not password or not confirm:
                 st.error("Please fill in all fields")
@@ -173,18 +183,10 @@ def show_report():
         )
     with col2:
         months = {
-            "January": "01",
-            "February": "02",
-            "March": "03",
-            "April": "04",
-            "May": "05",
-            "June": "06",
-            "July": "07",
-            "August": "08",
-            "September": "09",
-            "October": "10",
-            "November": "11",
-            "December": "12",
+            "January": "01", "February": "02", "March": "03",
+            "April": "04", "May": "05", "June": "06",
+            "July": "07", "August": "08", "September": "09",
+            "October": "10", "November": "11", "December": "12",
         }
         selected_month_name = st.selectbox(
             "Month", options=list(months.keys()), index=date.today().month - 1
@@ -193,9 +195,7 @@ def show_report():
     st.caption(f"Selected period: **{selected_month_name} {selected_year}**")
 
     if st.button("Generate Report", type="primary", use_container_width=True):
-        with st.spinner(
-            "Generating your financial health report... This may take 15-20 seconds."
-        ):
+        with st.spinner("Generating your financial health report... This may take 15-20 seconds."):
             data, error = get_report(st.session_state["access_token"], selected_month)
             if error:
                 st.error(f"Failed to generate report: {error}")
@@ -205,8 +205,6 @@ def show_report():
 
 def render_report(data):
     st.divider()
-
-    # Top metrics
     score = data.get("health_score", 0)
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -216,23 +214,13 @@ def render_report(data):
     with col3:
         st.metric("📂 Categories", len(data.get("breakdown", [])))
 
-    # Health score bar
     st.divider()
     st.subheader("🏆 Financial Health")
     score_icon = "🟢" if score >= 7 else "🟡" if score >= 4 else "🔴"
-    score_label = (
-        "Excellent"
-        if score >= 8
-        else "Good"
-        if score >= 6
-        else "Average"
-        if score >= 4
-        else "Poor"
-    )
+    score_label = "Excellent" if score >= 8 else "Good" if score >= 6 else "Average" if score >= 4 else "Poor"
     st.markdown(f"### {score_icon} {score}/10 — {score_label}")
     st.progress(score / 10)
 
-    # Spending breakdown
     st.divider()
     st.subheader("📈 Spending Breakdown")
     breakdown = data.get("breakdown", [])
@@ -250,20 +238,16 @@ def render_report(data):
     else:
         st.info("No spending data found for this month.")
 
-    # Patterns
     st.divider()
     st.subheader("🔍 Key Patterns")
     st.info(data.get("patterns", "No patterns identified."))
 
-    # Spending trend
     st.subheader("📊 Spending Trend")
     st.warning(data.get("spending_trend", "No trend data."))
 
-    # Top category
     st.subheader("🏅 Top Category")
     st.markdown(data.get("top_category", "No data."))
 
-    # Suggestions
     st.divider()
     st.subheader("💡 Suggestions")
     suggestions = data.get("suggestions", [])
@@ -273,28 +257,9 @@ def render_report(data):
     else:
         st.info("No suggestions available.")
 
-    # Full report
     st.divider()
     with st.expander("📄 View Full Report", expanded=False):
         st.markdown(data.get("report", "No report generated."))
-
-
-# Document Extractor API
-def extract_document(token, file):
-    try:
-        r = requests.post(
-            f"{BACKEND_URL}/api/extract_doc/",
-            files={"file": (file.name, file, file.type)},
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=120,
-        )
-        if r.status_code == 200:
-            return r.json(), None
-        return None, f"Error {r.status_code}: {r.text}"
-    except requests.exceptions.Timeout:
-        return None, "Request timed out. Please try again."
-    except Exception as e:
-        return None, str(e)
 
 
 # Document Extractor Page
@@ -317,14 +282,10 @@ def show_document():
     )
 
     if uploaded_file:
-        st.success(
-            f"✅ File selected: **{uploaded_file.name}** ({uploaded_file.size / 1024:.1f} KB)"
-        )
+        st.success(f"✅ File selected: **{uploaded_file.name}** ({uploaded_file.size / 1024:.1f} KB)")
         if st.button("Extract & Summarize", type="primary", use_container_width=True):
             with st.spinner("Analyzing your document..."):
-                data, error = extract_document(
-                    st.session_state["access_token"], uploaded_file
-                )
+                data, error = extract_document(st.session_state["access_token"], uploaded_file)
                 if error:
                     st.error(f"Failed: {error}")
                 else:
@@ -335,9 +296,7 @@ def show_document():
                     st.subheader("📋 Summary")
                     st.markdown(data.get("summary", "No summary available."))
                     st.divider()
-                    summary_text = (
-                        f"Date Range: {date_range}Summary:{data.get('summary', '')}"
-                    )
+                    summary_text = f"Date Range: {date_range}\n\nSummary:\n{data.get('summary', '')}"
                     st.download_button(
                         label="⬇️ Download Summary",
                         data=summary_text,
@@ -375,32 +334,27 @@ def show_chat():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    user_input = st.chat_input(
-        "e.g. 'Spent 200 at Zomato' or 'How much did I spend this month?'"
-    )
+    user_input = st.chat_input("e.g. 'Spent 200 at Zomato' or 'How much did I spend this month?'")
     if user_input:
         st.session_state["messages"].append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(user_input)
         with st.chat_message("assistant"):
-            # stream response word by word
-            def stream_response():
-                response, error = send_message(
-                    user_input, st.session_state["access_token"]
-                )
+            with st.spinner("Thinking..."):
+                response, error = send_message(user_input, st.session_state["access_token"])
                 if error:
-                    yield f"Error: {error}"
-                    return
-                for chunk in response.iter_content(
-                    chunk_size=None, decode_unicode=True
-                ):
-                    if chunk:
-                        yield chunk
-
-            full_response = st.write_stream(stream_response())
-            st.session_state["messages"].append(
-                {"role": "assistant", "content": full_response}
-            )
+                    if "401" in str(error) or "403" in str(error):
+                        st.error("Session expired. Please login again.")
+                        st.session_state["access_token"] = None
+                        st.session_state["page"] = "login"
+                        st.rerun()
+                    else:
+                        msg = f"Sorry, something went wrong: {error}"
+                        st.markdown(msg)
+                        st.session_state["messages"].append({"role": "assistant", "content": msg})
+                else:
+                    st.markdown(response)
+                    st.session_state["messages"].append({"role": "assistant", "content": response})
 
 
 # Router
