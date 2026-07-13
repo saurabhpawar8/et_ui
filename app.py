@@ -3,7 +3,7 @@ from datetime import date
 import requests
 import streamlit as st
 
-BACKEND_URL = "https://aiexpensetracker-production-c445.up.railway.app"
+BACKEND_URL = "http://localhost:8000"
 
 st.set_page_config(page_title="Expense Tracker AI", page_icon="💰", layout="centered")
 
@@ -26,8 +26,8 @@ def login(email, password):
             json={"email": email, "password": password},
             timeout=30,
         )
-        if r.status_code == 201:
-            return r.json(), None
+        if r.status_code == 200:
+            return r.json().get("message"), None
         return None, r.json().get("detail", "Invalid credentials")
     except Exception as e:
         return None, str(e)
@@ -56,7 +56,7 @@ def send_message(message, token):
             timeout=60,
         )
         if r.status_code == 200:
-            return r.json().get("response"), None
+            return r.json().get("message"), None
         return None, f"Error {r.status_code}: {r.text}"
     except requests.exceptions.Timeout:
         return None, "Request timed out. Please try again."
@@ -106,7 +106,9 @@ def show_login():
     with st.form("login_form"):
         email = st.text_input("Email", placeholder="you@example.com")
         password = st.text_input("Password", type="password", placeholder="••••••••")
-        submitted = st.form_submit_button("Login", use_container_width=True, type="primary")
+        submitted = st.form_submit_button(
+            "Login", use_container_width=True, type="primary"
+        )
         if submitted:
             if not email or not password:
                 st.error("Please enter both email and password")
@@ -114,7 +116,8 @@ def show_login():
                 with st.spinner("Logging in..."):
                     data, error = login(email, password)
                     if data:
-                        st.session_state["access_token"] = data["access"]
+                        print(data)
+                        st.session_state["access_token"] = data["data"]["access"]
                         st.session_state["messages"] = []
                         st.session_state["page"] = "chat"
                         st.rerun()
@@ -141,8 +144,12 @@ def show_register():
     with st.form("register_form"):
         email = st.text_input("Email", placeholder="you@example.com")
         password = st.text_input("Password", type="password", placeholder="••••••••")
-        confirm = st.text_input("Confirm Password", type="password", placeholder="••••••••")
-        submitted = st.form_submit_button("Register", use_container_width=True, type="primary")
+        confirm = st.text_input(
+            "Confirm Password", type="password", placeholder="••••••••"
+        )
+        submitted = st.form_submit_button(
+            "Register", use_container_width=True, type="primary"
+        )
         if submitted:
             if not email or not password or not confirm:
                 st.error("Please fill in all fields")
@@ -183,10 +190,18 @@ def show_report():
         )
     with col2:
         months = {
-            "January": "01", "February": "02", "March": "03",
-            "April": "04", "May": "05", "June": "06",
-            "July": "07", "August": "08", "September": "09",
-            "October": "10", "November": "11", "December": "12",
+            "January": "01",
+            "February": "02",
+            "March": "03",
+            "April": "04",
+            "May": "05",
+            "June": "06",
+            "July": "07",
+            "August": "08",
+            "September": "09",
+            "October": "10",
+            "November": "11",
+            "December": "12",
         }
         selected_month_name = st.selectbox(
             "Month", options=list(months.keys()), index=date.today().month - 1
@@ -195,7 +210,9 @@ def show_report():
     st.caption(f"Selected period: **{selected_month_name} {selected_year}**")
 
     if st.button("Generate Report", type="primary", use_container_width=True):
-        with st.spinner("Generating your financial health report... This may take 15-20 seconds."):
+        with st.spinner(
+            "Generating your financial health report... This may take 15-20 seconds."
+        ):
             data, error = get_report(st.session_state["access_token"], selected_month)
             if error:
                 st.error(f"Failed to generate report: {error}")
@@ -217,7 +234,15 @@ def render_report(data):
     st.divider()
     st.subheader("🏆 Financial Health")
     score_icon = "🟢" if score >= 7 else "🟡" if score >= 4 else "🔴"
-    score_label = "Excellent" if score >= 8 else "Good" if score >= 6 else "Average" if score >= 4 else "Poor"
+    score_label = (
+        "Excellent"
+        if score >= 8
+        else "Good"
+        if score >= 6
+        else "Average"
+        if score >= 4
+        else "Poor"
+    )
     st.markdown(f"### {score_icon} {score}/10 — {score_label}")
     st.progress(score / 10)
 
@@ -282,10 +307,14 @@ def show_document():
     )
 
     if uploaded_file:
-        st.success(f"✅ File selected: **{uploaded_file.name}** ({uploaded_file.size / 1024:.1f} KB)")
+        st.success(
+            f"✅ File selected: **{uploaded_file.name}** ({uploaded_file.size / 1024:.1f} KB)"
+        )
         if st.button("Extract & Summarize", type="primary", use_container_width=True):
             with st.spinner("Analyzing your document..."):
-                data, error = extract_document(st.session_state["access_token"], uploaded_file)
+                data, error = extract_document(
+                    st.session_state["access_token"], uploaded_file
+                )
                 if error:
                     st.error(f"Failed: {error}")
                 else:
@@ -334,14 +363,18 @@ def show_chat():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    user_input = st.chat_input("e.g. 'Spent 200 at Zomato' or 'How much did I spend this month?'")
+    user_input = st.chat_input(
+        "e.g. 'Spent 200 at Zomato' or 'How much did I spend this month?'"
+    )
     if user_input:
         st.session_state["messages"].append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(user_input)
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                response, error = send_message(user_input, st.session_state["access_token"])
+                response, error = send_message(
+                    user_input, st.session_state["access_token"]
+                )
                 if error:
                     if "401" in str(error) or "403" in str(error):
                         st.error("Session expired. Please login again.")
@@ -351,10 +384,15 @@ def show_chat():
                     else:
                         msg = f"Sorry, something went wrong: {error}"
                         st.markdown(msg)
-                        st.session_state["messages"].append({"role": "assistant", "content": msg})
+                        st.session_state["messages"].append(
+                            {"role": "assistant", "content": msg}
+                        )
                 else:
+                    print(response)
                     st.markdown(response)
-                    st.session_state["messages"].append({"role": "assistant", "content": response})
+                    st.session_state["messages"].append(
+                        {"role": "assistant", "content": response}
+                    )
 
 
 # Router
