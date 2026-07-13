@@ -3,7 +3,7 @@ from datetime import date
 import requests
 import streamlit as st
 
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "https://aiexpensetracker-production-c445.up.railway.app"
 
 st.set_page_config(page_title="Expense Tracker AI", page_icon="💰", layout="centered")
 
